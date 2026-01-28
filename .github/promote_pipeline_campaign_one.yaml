@@ -1,0 +1,72 @@
+name: Deploy Campaign One
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+      run_pipeline:
+        description: "Run pipeline after deploy"
+        required: false
+        type: boolean
+        default: false
+
+  push:
+    branches: [develop]
+    paths:
+      - "src/components/run_campaign_one/**"
+      - "config/dev.yml"
+
+concurrency:
+  group: deploy-campaign-one-${{ github.event.inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+env:
+  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.1.1
+
+      - name: Setup Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate Bundle
+        run: databricks bundle validate -t ${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Deploy Asset Bundle
+        run: databricks bundle deploy -t ${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Run Inference Pipeline
+        if: github.event.inputs.run_pipeline == 'true'
+        run: databricks bundle run campaign_one_inference -t ${{ github.event.inputs.environment || 'dev' }}
+
+  notify:
+    name: Notify Status
+    needs: [deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## Campaign One Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ github.event.inputs.environment || 'dev' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY

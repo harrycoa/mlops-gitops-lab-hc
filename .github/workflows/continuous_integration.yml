@@ -1,0 +1,63 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Code Quality
+    uses: ./.github/workflows/reusable_lint_python_validator.yml
+    with:
+      pyProjectDirectory: "pyproject.toml"
+      python-version: "['3.10']"
+      checkBlack: true
+      checkFlake8: true
+      checkIsort: true
+      checkPylint: true
+      checkMypy: true
+      checkInterrogate: false
+      checkDarglint: false
+      checkDocformatter: false
+      checkSortRequirements: false
+    secrets:
+      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validate_bundle:
+    name: Validate Databricks Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.1.1
+
+      - name: Setup Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate Bundle Configuration
+        run: databricks bundle validate
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+  pr_comment:
+    name: PR Status
+    needs: [lint, validate_bundle]
+    if: always()
+    uses: ./.github/workflows/reusable_pr_comment.yml
+    with:
+      message: |
+        ## CI Pipeline Results
+
+        | Check | Status |
+        |-------|--------|
+        | Lint | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} |
+        | Bundle Validation | ${{ needs.validate_bundle.result == 'success' && '✅ Passed' || '❌ Failed' }} |
+
+        **Overall**: ${{ (needs.lint.result == 'success' && needs.validate_bundle.result == 'success') && '✅ Ready to merge' || '❌ Requires fixes' }}
+    secrets:
+      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
