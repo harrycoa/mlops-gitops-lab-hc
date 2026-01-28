@@ -1,0 +1,32 @@
+# Production environment configuration for Databricks Asset Bundle
+# Usage: databricks bundle deploy -t prod
+
+variables:
+  databricks_host: "https://adb-XXXXXXXXX.XX.azuredatabricks.net" # TODO: Replace with your prod workspace
+  catalog_name: "mlops_course"
+  schema_bronze: "bronze"
+  schema_silver: "silver"
+  schema_gold: "gold"
+  node_type_id: "Standard_DS4_v2"
+  num_workers: 2
+  service_principal: "sp-mlops-prod" # TODO: Replace with your service principal
+
+# Production-specific overrides
+resources:
+  jobs:
+    campaign_one_inference:
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?" # Daily at 6 AM
+        timezone_id: "America/Lima"
+        pause_status: UNPAUSED
+      email_notifications:
+        on_failure:
+          - "mlops-alerts@example.com" # TODO: Replace with your team email
+        on_success:
+          - "mlops-alerts@example.com"
+
+    campaign_two_inference:
+      schedule:
+        quartz_cron_expression: "0 0 7 * * ?" # Daily at 7 AM
+        timezone_id: "America/Lima"
+        pause_status: UNPAUSED

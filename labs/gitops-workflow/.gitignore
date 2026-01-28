@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+
+# Model artifacts (generated locally)
+artifacts/*.pkl
+artifacts/*.json
+!artifacts/.gitkeep
+
+# Data files (generated locally)
+data/*.csv
+!data/.gitkeep
+
+# Environment and config
+.env
+config.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

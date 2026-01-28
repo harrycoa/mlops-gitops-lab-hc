@@ -1,0 +1,26 @@
+# Development environment configuration for Databricks Asset Bundle
+# Usage: databricks bundle deploy -t dev
+
+variables:
+  databricks_host: "https://adb-XXXXXXXXX.XX.azuredatabricks.net" # TODO: Replace with your dev workspace
+  catalog_name: "mlops_course_dev"
+  schema_bronze: "bronze"
+  schema_silver: "silver"
+  schema_gold: "gold"
+  node_type_id: "Standard_DS3_v2"
+  num_workers: 1
+
+# Development-specific overrides
+resources:
+  jobs:
+    campaign_one_inference:
+      schedule:
+        # No schedule in dev - manual runs only
+        pause_status: PAUSED
+      email_notifications:
+        on_failure:
+          - "danielalpiste@gmail.com" # TODO: Replace with your email
+
+    campaign_two_inference:
+      schedule:
+        pause_status: PAUSED
