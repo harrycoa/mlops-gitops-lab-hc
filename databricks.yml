@@ -1,0 +1,141 @@
+# Databricks Asset Bundle configuration
+# See https://docs.databricks.com/dev-tools/bundles/
+
+bundle:
+  name: mlops_template_utec
+
+# Include configurations per environment
+include:
+  - ./config/*.yml
+
+# Workspace settings
+workspace:
+  host: ${var.databricks_host}
+
+# Variables for parameterization
+variables:
+  databricks_host:
+    description: "Databricks workspace URL"
+  catalog_name:
+    description: "Unity Catalog name"
+    default: "mlops_course"
+  schema_bronze:
+    description: "Bronze layer schema"
+    default: "bronze"
+  schema_silver:
+    description: "Silver layer schema"
+    default: "silver"
+  schema_gold:
+    description: "Gold layer schema"
+    default: "gold"
+
+# Artifacts to deploy
+artifacts:
+  mlops_wheel:
+    type: whl
+    path: ./dist
+
+# Resources definition
+resources:
+  # Campaign One Pipeline
+  jobs:
+    campaign_one_inference:
+      name: "[${bundle.target}] Campaign One - Inference Pipeline"
+      tasks:
+        - task_key: build_universe
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_one/01_build_universe.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+        - task_key: transformation
+          depends_on:
+            - task_key: build_universe
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_one/02_transformation.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+        - task_key: inference
+          depends_on:
+            - task_key: transformation
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_one/03_inference.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+    campaign_one_evaluation:
+      name: "[${bundle.target}] Campaign One - Evaluation"
+      tasks:
+        - task_key: evaluation
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_one/04_evaluation.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+    campaign_one_retrain:
+      name: "[${bundle.target}] Campaign One - Retrain"
+      tasks:
+        - task_key: retrain
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_one/05_retrain.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+    # Campaign Two Pipeline
+    campaign_two_inference:
+      name: "[${bundle.target}] Campaign Two - Inference Pipeline"
+      tasks:
+        - task_key: build_universe
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_two/01_build_universe.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+        - task_key: transformation
+          depends_on:
+            - task_key: build_universe
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_two/02_transformation.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+        - task_key: inference
+          depends_on:
+            - task_key: transformation
+          notebook_task:
+            notebook_path: ./src/components/run_campaign_two/03_inference.py
+            source: WORKSPACE
+          job_cluster_key: ml_cluster
+
+  # Job cluster configuration
+  job_clusters:
+    - job_cluster_key: ml_cluster
+      new_cluster:
+        spark_version: "14.3.x-cpu-ml-scala2.12"
+        node_type_id: ${var.node_type_id}
+        num_workers: ${var.num_workers}
+        spark_conf:
+          spark.databricks.unity.catalog.enabled: "true"
+
+# Target environments
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${var.databricks_host}
+    variables:
+      node_type_id: "Standard_DS3_v2"
+      num_workers: 1
+
+  prod:
+    mode: production
+    workspace:
+      host: ${var.databricks_host}
+      root_path: /Shared/.bundle/prod/${bundle.name}
+    variables:
+      node_type_id: "Standard_DS4_v2"
+      num_workers: 2
+    run_as:
+      service_principal_name: ${var.service_principal}
